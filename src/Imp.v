@@ -9,7 +9,7 @@ From Coq Require Import Strings.String.
 Import ListNotations.
 
 From PLF Require Import Maps.
-‹(* ################################################################# *)
+(* ################################################################# *)
 (** * Expressions With Variables *)
 
 (** Back to defining Imp.  The next thing we need to do is to enrich
