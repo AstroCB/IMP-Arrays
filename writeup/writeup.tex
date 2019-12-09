@@ -29,7 +29,42 @@
     \section{Source Code}
     This project was implemented with Coq and the source code can be found \href{https://github.com/AstroCB/IMP-Arrays}{here}.
 
-    \section{Implementation Differences}
+    \section{Implementation}
+    I ended up implementing the array for this language as a single global array for simplicity, as planned. The array can be accessed using the following IMP syntax:
+    \begin{itemize}
+        \item \texttt{HD}: retrieve the element at the front of the array
+        \item \texttt{IND a}: retrieve the element at index \texttt{a} in the array (\texttt{a} is evaluated into a \texttt{nat} before retrieval)
+        \item \texttt{LEN}: returns the current length of the array
+    \end{itemize}
 
+    To mutate the array, the following commands were added to IMP as well:
+    \begin{itemize}
+        \item \texttt{CONS a}: add an element \texttt{a} of type \texttt{aexp} to the front of the array (\texttt{a} is evaluated into a \texttt{nat} before being added)
+        \item \texttt{SET a1 TO a2}: sets the element at index \texttt{n1} to the value \texttt{n2}, where \texttt{n1} and \texttt{n2} are the results of evaluating \texttt{aexp}s \texttt{a1} and \texttt{a2}, respectively.
+    \end{itemize}
+    
+    The global array was introduced by modifying the state of IMP programs to include an additional component. Evaluation of a command \texttt{c} now takes the form \texttt{m =[c]=> m'}, where \texttt{m} and \texttt{m'} are of type \texttt{mem}:
+    \begin{lstlisting}
+        Definition array := list nat.
+        Definition mem : Type := state * array.
+    \end{lstlisting}
+    
+    If the evaluation of the command modifies the variables or array of the program's state, it can pull out the appropriate component of the \texttt{m} pair. Initially I proposed only allowing \texttt{ANum}s to be added to the program's array, but it turned out to be easier to generalize the array commands to operate on \texttt{aexp}s and evaluate them to \texttt{nat}s. The array access expressions (\texttt{HD}, \texttt{IND}, and \texttt{LEN}) are also implemented as \texttt{aexp}s and can be used anywhere that an \texttt{aexp} is expected in IMP. This allows for idiomatic iterative IMP code to be written fairly easily:
+    \begin{lstlisting}
+        Definition repeat : com :=
+            WHILE ~(Z = 0) DO
+                CONS X;;
+                Z ::= Z - 1
+            END
+
+        Definition decrement : com :=
+            I = 0;;
+            WHILE (I < LEN) DO
+                SET I TO ((IND I) - 1);;
+                I ::= I + 1
+            END
+    \end{lstlisting}
+
+    There are examples of each of the new syntax pieces included throughout the Coq file that briefly demonstrate their behavior.
     \section{Takeaways}
 \end{document}
