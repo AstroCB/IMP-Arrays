@@ -140,11 +140,6 @@ Notation "'LEN'" := ALen : imp_scope.
 (** The arith and boolean evaluators are extended to handle
     variables in the obvious way, taking a state as an extra
     argument: *)
-Fixpoint len (l : array) : nat :=
-match l with
-| nil => 0
-| h::t => 1 + len t
-end.
 
 Fixpoint aeval (m : mem) (a : aexp) : nat :=
   let (st, arr) := m in
@@ -157,7 +152,7 @@ Fixpoint aeval (m : mem) (a : aexp) : nat :=
   (* ARR OPS *)
   | AHd => hd 0 arr
   | AInd a1 => nth (aeval m a1) arr 0
-  | ALen => len arr
+  | ALen => List.length arr
   end.
 
 Fixpoint beval (m : mem) (b : bexp) : bool :=
@@ -606,6 +601,18 @@ Proof.
       split. assumption. apply bexp_eval_true. assumption.
 Qed.
 
+(* HOARE RULE FOR SET *)
+Definition set_sub a1 a2 P : Assertion :=
+  fun (m : mem) => P ((fst m), (repl (snd m) (aeval m a1) (aeval m a2))).
+
+Theorem hoare_set : forall (Q : Assertion) (a1 a2 : aexp),
+{{set_sub a1 a2 Q}} SET a1 TO a2 {{Q}}.
+Proof.
+  unfold hoare_triple. intros.
+  inversion H; subst.
+  unfold set_sub in H0. assumption.
+Qed.
+
 (* HOARE ARR EXAMPLES *)
 Example cons_hoare :
   {{fun m => (snd m) = []}} CONS 1 {{fun m => snd m = [1]}}.
@@ -634,7 +641,7 @@ Qed.
 
 Definition insertion_sort : com :=
   I ::= 1;;
-  WHILE (X < LEN) DO
+  WHILE (I < LEN) DO
     X ::= IND I;;
     J ::= I - 1;;
     WHILE ((J >= 0) && ((IND J) > X)) DO
@@ -644,3 +651,56 @@ Definition insertion_sort : com :=
     SET (J+1) TO X;;
     I ::= I + 1
   END.
+
+Inductive sorted: list nat -> Prop :=
+| sorted_nil:
+    sorted nil
+| sorted_1: forall x,
+    sorted (x::nil)
+| sorted_cons: forall x y l,
+   x <= y -> sorted (y::l) -> sorted (x::y::l).
+
+Lemma and_split : forall a b, a && b = true -> a = true /\ b = true.
+Proof.
+  intros. split. destruct a. reflexivity. simpl in H. inversion H. destruct b.
+  reflexivity. simpl in H. inversion H. destruct a in H. simpl in H. inversion H. simpl in H. inversion H.
+Qed.
+
+Example sorted_ex :
+  {{ fun m => (snd m) = [2;3;1;4] }} insertion_sort {{ fun m => sorted (snd m) }}.
+Proof.
+  unfold insertion_sort. eapply hoare_seq. eapply hoare_consequence_post. apply hoare_while. eapply hoare_consequence_pre.
+  eapply hoare_seq. eapply hoare_seq. eapply hoare_seq. eapply hoare_seq.
+  - apply hoare_asgn.
+  - apply hoare_set.
+  - admit.
+  - apply hoare_asgn.
+  - apply hoare_asgn.
+  - unfold assert_implies. intros. destruct H. simpl.
+
+
+Theorem insertion_sort_correct :
+  {{fun m => True}} insertion_sort {{ fun m => sorted (snd m) }}.
+Proof.
+  unfold insertion_sort. apply hoare_seq with (Q := (fun (m : mem) => (fst m) I = 1)).
+  - eapply hoare_consequence_post. apply hoare_while. eapply hoare_consequence_pre.
+    eapply hoare_seq. (*with (Q := (fun (m : mem) => (fst m) X = nth ((fst m) I) (snd m) 0)).*)
+    apply hoare_seq with (Q := (fun (m : mem) => (fst m) J = ((fst m) I) - 1)).
+    eapply hoare_seq. eapply hoare_seq.
+    + apply hoare_asgn.
+    + apply hoare_set.
+    + admit.
+    + apply hoare_asgn.
+    + apply hoare_asgn.
+    + admit.
+    + unfold assert_implies. intros. destruct H. induction m. simpl. simpl in *. unfold bassn in *. 
+   - unfold hoare_triple. intros. inversion H; subst. unfold m_update in *. simpl in *.
+     destruct m in *. unfold t_update. simpl. reflexivity.
+
+
+
+    + eapply hoare_consequence_post. apply hoare_while. eapply hoare_consequence_pre. eapply hoare_seq.
+      * apply hoare_asgn.
+      * apply hoare_set.
+      * unfold bassn, set_sub, assert_implies. intros. destruct m. simpl in *. destruct H.
+        unfold assn_sub. simpl. 
