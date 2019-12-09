@@ -639,6 +639,21 @@ Proof.
   simpl in H. simpl in H0. rewrite H0. simpl. reflexivity.
 Qed.
 
+(* INSERTION SORT *)
+
+(* Inductive and propositional sorted definitions *)
+Inductive sorted: list nat -> Prop :=
+| sorted_nil:
+    sorted nil
+| sorted_1: forall x,
+    sorted (x::nil)
+| sorted_cons: forall x y l,
+   x <= y -> sorted (y::l) -> sorted (x::y::l).
+
+Definition sorted' (al: list nat) :=
+ forall i j, i < j < List.length al -> nth i al 0 <= nth j al 0. 
+
+(* Standard insertion sort definition *)
 Definition insertion_sort : com :=
   I ::= 1;;
   WHILE (I < LEN) DO
@@ -652,13 +667,29 @@ Definition insertion_sort : com :=
     I ::= I + 1
   END.
 
-Inductive sorted: list nat -> Prop :=
-| sorted_nil:
-    sorted nil
-| sorted_1: forall x,
-    sorted (x::nil)
-| sorted_cons: forall x y l,
-   x <= y -> sorted (y::l) -> sorted (x::y::l).
+(* Insertion sort definition using insert subroutine *)
+(* Inserts item into a sorted list and maintains sort *)
+Definition insert : com :=
+  WHILE ((I >= 0) && ((IND I) > X)) DO
+    SET (I + 1) TO (IND I);;
+    I ::= I - 1
+  END;;
+  SET (I + 1) TO X.
+
+Lemma insert_stays_sorted :
+  {{ fun m => sorted (snd m) }} insert {{ fun m' => sorted (snd m') }}.
+Proof.
+  Admitted.
+
+Definition insertion_sort' : com :=
+  I ::= 0;;
+  WHILE (I < LEN) DO
+    J ::= I;;
+    X ::= IND (I+1);;
+    insert;;
+    I ::= J + 1
+  END.
+
 
 Lemma and_split : forall a b, a && b = true -> a = true /\ b = true.
 Proof.
@@ -666,41 +697,9 @@ Proof.
   reflexivity. simpl in H. inversion H. destruct a in H. simpl in H. inversion H. simpl in H. inversion H.
 Qed.
 
-Example sorted_ex :
-  {{ fun m => (snd m) = [2;3;1;4] }} insertion_sort {{ fun m => sorted (snd m) }}.
-Proof.
-  unfold insertion_sort. eapply hoare_seq. eapply hoare_consequence_post. apply hoare_while. eapply hoare_consequence_pre.
-  eapply hoare_seq. eapply hoare_seq. eapply hoare_seq. eapply hoare_seq.
-  - apply hoare_asgn.
-  - apply hoare_set.
-  - admit.
-  - apply hoare_asgn.
-  - apply hoare_asgn.
-  - unfold assert_implies. intros. destruct H. simpl.
-
 
 Theorem insertion_sort_correct :
-  {{fun m => True}} insertion_sort {{ fun m => sorted (snd m) }}.
+  {{fun m => True}} insertion_sort {{ fun m' => sorted (snd m') }}.
 Proof.
-  unfold insertion_sort. apply hoare_seq with (Q := (fun (m : mem) => (fst m) I = 1)).
-  - eapply hoare_consequence_post. apply hoare_while. eapply hoare_consequence_pre.
-    eapply hoare_seq. (*with (Q := (fun (m : mem) => (fst m) X = nth ((fst m) I) (snd m) 0)).*)
-    apply hoare_seq with (Q := (fun (m : mem) => (fst m) J = ((fst m) I) - 1)).
-    eapply hoare_seq. eapply hoare_seq.
-    + apply hoare_asgn.
-    + apply hoare_set.
-    + admit.
-    + apply hoare_asgn.
-    + apply hoare_asgn.
-    + admit.
-    + unfold assert_implies. intros. destruct H. induction m. simpl. simpl in *. unfold bassn in *. 
-   - unfold hoare_triple. intros. inversion H; subst. unfold m_update in *. simpl in *.
-     destruct m in *. unfold t_update. simpl. reflexivity.
+Admitted.
 
-
-
-    + eapply hoare_consequence_post. apply hoare_while. eapply hoare_consequence_pre. eapply hoare_seq.
-      * apply hoare_asgn.
-      * apply hoare_set.
-      * unfold bassn, set_sub, assert_implies. intros. destruct m. simpl in *. destruct H.
-        unfold assn_sub. simpl. 
