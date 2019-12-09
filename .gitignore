@@ -2,6 +2,7 @@
 *.vo
 *.aux
 *.d
+*.synctex.gz
 \#*
-*.pdf
+\.#*
 *.pages
