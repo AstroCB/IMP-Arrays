@@ -586,14 +586,14 @@ Proof.
       split. assumption.
       apply bexp_eval_false. assumption. Qed.
 Theorem hoare_while : forall P b c,
-  {{fun st => P st /\ bassn b st}} c {{P}} ->
-  {{P}} WHILE b DO c END {{fun st => P st /\ ~ (bassn b st)}}.
+  {{fun m => P m /\ bassn b m}} c {{P}} ->
+  {{P}} WHILE b DO c END {{fun m => P m /\ ~ (bassn b m)}}.
 Proof.
   intros P b c Hhoare m m' He HP.
   remember (WHILE b DO c END)%imp as wcom eqn:Heqwcom.
   induction He;
     try (inversion Heqwcom); subst; clear Heqwcom.
-  - (* E_WhileFalse *) 
+  - (* E_WhileFalse *)
     split. assumption. apply bexp_eval_false. assumption.
   - (* E_WhileTrue *)
     apply IHHe2. reflexivity.
@@ -639,7 +639,41 @@ Proof.
   simpl in H. simpl in H0. rewrite H0. simpl. reflexivity.
 Qed.
 
-(* INSERTION SORT *)
+(* SWAP PROGRAM AND PROOF OF CORRECTNESS *)
+
+Definition swap : com :=
+  X ::= IND I;;
+  SET I TO (IND J);;
+  SET J TO X.
+
+Lemma repl_and_retrieve : forall arr i n,
+    nth i (repl arr i n) 0 = n.
+Proof.
+Admitted.
+
+Lemma redundant_add : forall arr i j n1 n2,
+    n1 <> n2 -> repl (repl arr i n1) j n2 = repl arr i n1.
+Proof.
+Admitted.
+
+Theorem swap_correct : forall n1 n2,
+  {{ fun m => n1 <> n2 /\ nth ((fst m) I) (snd m) 0 = n1 /\ nth ((fst m) J) (snd m) 0 = n2 }}
+    swap
+  {{ fun m => nth ((fst m) I) (snd m) 0 = n2 /\ nth ((fst m) J) (snd m) 0 = n1 }}.
+Proof.
+  intros n1 n2.
+  unfold swap.
+  eapply hoare_seq.
+  eapply hoare_seq.
+  - apply hoare_set.
+  - apply hoare_set.
+  - eapply hoare_consequence_pre. apply hoare_asgn.
+    intros m [Hneq H]. unfold assn_sub, set_sub, t_update. destruct m. simpl in *. destruct H. rewrite H. rewrite H0. split.
+    + rewrite redundant_add. apply repl_and_retrieve. auto.
+    + apply repl_and_retrieve.
+Qed.
+
+(* INSERTION SORT AND PROOF OF CORRECTNESS (INCOMPLETE) *)
 
 (* Inductive and propositional sorted definitions *)
 Inductive sorted: list nat -> Prop :=
@@ -701,5 +735,51 @@ Qed.
 Theorem insertion_sort_correct :
   {{fun m => True}} insertion_sort {{ fun m' => sorted (snd m') }}.
 Proof.
+unfold insertion_sort. apply hoare_seq with (Q := (fun (m : mem) => (fst m) I = 1)).
+  - eapply hoare_consequence_post. apply hoare_while. eapply hoare_consequence_pre.
+    eapply hoare_seq. (*with (Q := (fun (m : mem) => (fst m) X = nth ((fst m) I) (snd m) 0)).*)
+    apply hoare_seq with (Q := (fun (m : mem) => (fst m) J = ((fst m) I) - 1)).
+    eapply hoare_seq. eapply hoare_seq.
+    + apply hoare_asgn.
+    + apply hoare_set.
+    + admit.
+    + apply hoare_asgn.
+    + apply hoare_asgn.
+    + admit.
+    + unfold assert_implies. intros. destruct H. induction m. simpl. simpl in *. unfold bassn in *. admit.
+   - unfold hoare_triple. intros. inversion H; subst. unfold m_update in *. simpl in *.
+     destruct m in *. unfold t_update. simpl. reflexivity.
 Admitted.
 
+(* MINIMUM VALUE PROGRAM AND PROOF OF CORRECTNESS (INCOMPLETE) *)
+
+Definition min : com :=
+  X ::= HD;;
+  I ::= 1;;
+  WHILE (I < LEN) DO
+    Y ::= IND I;;
+    TEST (Y < X) THEN X ::= Y ELSE SKIP FI;;
+    I ::= I + 1
+  END.
+
+Fixpoint find_min (lst : array) : nat :=
+  match lst with
+  | [] => 0
+  | [h] => h
+  | h::t => Nat.min h (find_min t)
+  end.
+
+
+Theorem min_correct :
+  {{ fun m => True }} min {{ fun m => (fst m) X = find_min (snd m) }}.
+Proof.
+  unfold min.
+  apply hoare_seq with (Q := (fun (m : mem) => (fst m) X = hd 0 (snd m))).
+  apply hoare_seq with (Q := (fun (m : mem) => (fst m) I = 1)).
+  eapply hoare_consequence_post. apply hoare_while. eapply hoare_seq. eapply hoare_seq. apply hoare_asgn.
+  - apply hoare_if. eapply hoare_consequence_pre. apply hoare_asgn. admit. eapply hoare_consequence_pre. apply hoare_skip. admit.
+  - eapply hoare_consequence_pre. apply hoare_asgn. admit.
+  - admit.
+  - eapply hoare_consequence_pre. apply hoare_asgn. admit.
+  - unfold hoare_triple. intros. inversion H; subst. unfold m_update, t_update. simpl. destruct m. simpl. reflexivity.
+Admitted.
